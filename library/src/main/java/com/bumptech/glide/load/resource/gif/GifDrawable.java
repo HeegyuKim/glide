@@ -41,6 +41,12 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
   // Public API.
   @SuppressWarnings("WeakerAccess")
   public static final int LOOP_INTRINSIC = 0;
+
+  /**
+   *
+   */
+  public static final int SOURCE_FRAME = 0;
+
   private static final int GRAVITY = Gravity.FILL;
 
   private final GifState state;
@@ -71,6 +77,11 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
    * The number of times to loop through the GIF animation.
    */
   private int maxLoopCount = LOOP_FOREVER;
+  /**
+   * GIF Animation drawing frame count per second
+   */
+  private int framePerSecond = SOURCE_FRAME;
+  private long lastDrawnTime = 0;
 
   private boolean applyGravity;
   private Paint paint;
@@ -198,6 +209,16 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
     loopCount = 0;
   }
 
+  public int getFramePerSecond() {
+    return framePerSecond;
+  }
+
+  public void setFramePerSecond(int framePerSecond) {
+    Preconditions.checkArgument(framePerSecond >= 0,
+        "framePerSecond must be larger than 0 or SOURCE_FRAME");
+    this.framePerSecond = framePerSecond;
+  }
+
   /**
    * Starts the animation from the first frame. Can only be called while animation is not running.
    */
@@ -295,6 +316,8 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
 
     Bitmap currentFrame = state.frameLoader.getCurrentFrame();
     canvas.drawBitmap(currentFrame, null, getDestRect(), getPaint());
+
+    lastDrawnTime = System.currentTimeMillis();
   }
 
   @Override
@@ -344,7 +367,8 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
       return;
     }
 
-    invalidateSelf();
+    if(checkFramePerSecond())
+      invalidateSelf();
 
     if (getFrameIndex() == getFrameCount() - 1) {
       loopCount++;
@@ -353,6 +377,18 @@ public class GifDrawable extends Drawable implements GifFrameLoader.FrameCallbac
     if (maxLoopCount != LOOP_FOREVER && loopCount >= maxLoopCount) {
       stop();
     }
+  }
+
+  private boolean checkFramePerSecond() {
+    if(framePerSecond != SOURCE_FRAME) {
+      long current = System.currentTimeMillis();
+      long delta = current - lastDrawnTime;
+      if(delta < 1000 / framePerSecond) {
+        // skip this drawing.
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
